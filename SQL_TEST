@@ -1,0 +1,950 @@
+-- Tables à mettre à jour 
+
+-- vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft
+-- vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice
+-- vg1p-apps-pricingkf-prd01-52.erwan_bringer.PFT_TEMP_BIBLIO_R22
+-- vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft_mobeye
+
+
+Create or replace table vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data as
+
+SELECT * FROM (
+
+--- Vague 1 est la plus récente
+    SELECT date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, prix_promo, '1' as vague
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft
+    WHERE semaine = (SELECT max(semaine) from vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft)
+    GROUP BY date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, prix_promo
+
+    union distinct 
+
+    SELECT  date_n, semaine, mois, cast(code_lsa as string), groupe_enseigne, enseigne, nom_magasin, cast(code_rayon as string), lib_rayon, cast(code_groupe_de_famille as string),
+    lib_groupe_de_famille, cast(code_groupe_de_sous_famille as string), lib_groupe_de_sous_famille, cast(ref_produit as string), lib_produit, ud, prix_de_vente, promo, '1' as vague
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft_mobeye
+    WHERE date_n = (SELECT  max(date_n) from vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft_mobeye)
+    GROUP BY date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, promo
+    
+
+    union distinct
+    
+    SELECT date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, prix_promo, '2' as vague
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft
+    WHERE semaine = (SELECT MAX(semaine)
+FROM   vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft
+WHERE  semaine<(SELECT MAX(semaine) FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft))
+    GROUP BY date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, prix_promo
+    
+    union distinct
+    
+    SELECT   date_n, semaine, mois, cast(code_lsa as string), groupe_enseigne, enseigne, nom_magasin, cast(code_rayon as string), lib_rayon, cast(code_groupe_de_famille as string),
+    lib_groupe_de_famille, cast(code_groupe_de_sous_famille as string), lib_groupe_de_sous_famille, cast(ref_produit as string), lib_produit, ud, prix_de_vente, promo, '2' as vague
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft_mobeye
+    WHERE date_n = (SELECT  min(date_n) from (SELECT  distinct date_n,ROW_NUMBER() OVER() AS row_number from vg1p-apps-pricingkf-prd01-52.erwan_bringer.data_prix_pft_mobeye ORDER BY date_n DESC) where row_number <= 3)
+    GROUP BY date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, promo
+   
+) WHERE code_rayon = '22'
+GROUP BY date_n, semaine, mois, code_lsa, groupe_enseigne, enseigne, nom_magasin, code_rayon, lib_rayon, code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, lib_produit, ud, prix_de_vente, prix_promo, vague
+;
+
+Create or replace table vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join as
+WITH last_mercus as (
+    SELECT Agregation, code_produit, Description_produit, Code_IFLS, Groupe_famille, c.class_key, c.class_desc, 
+    c.grp_class_key, c.grp_class_desc,
+        Date_mercuriale , Date_livraison_mercuriale, PA_Precedent, PA_Actuel, Prix_actuel_H1, Prix_actuel_H2, 
+        Prix_actuel_H3, Prix_actuel_H4, Prix_actuel_H5, 
+        Prix_actuel_H6, Prix_actuel_H7, Prix_actuel_H8,
+        CASE WHEN Prix_a_venir_H1 > 0 THEN Prix_a_venir_H1 ELSE Prix_actuel_H1 END AS Futur_Prix_H1,
+        CASE WHEN Prix_a_venir_H2 > 0 THEN Prix_a_venir_H2 ELSE Prix_actuel_H2 END AS Futur_Prix_H2,
+        CASE WHEN Prix_a_venir_H3 > 0 THEN Prix_a_venir_H3 ELSE Prix_actuel_H3 END AS Futur_Prix_H3,
+        CASE WHEN Prix_a_venir_H4 > 0 THEN Prix_a_venir_H4 ELSE Prix_actuel_H4 END AS Futur_Prix_H4,
+        CASE WHEN Prix_a_venir_H5 > 0 THEN Prix_a_venir_H5 ELSE Prix_actuel_H5 END AS Futur_Prix_H5,
+        CASE WHEN Prix_a_venir_H6 > 0 THEN Prix_a_venir_H6 ELSE Prix_actuel_H6 END AS Futur_Prix_H6,
+        CASE WHEN Prix_a_venir_H7 > 0 THEN Prix_a_venir_H7 ELSE Prix_actuel_H7 END AS Futur_Prix_H7,
+        CASE WHEN Prix_a_venir_H8 > 0 THEN Prix_a_venir_H8 ELSE Prix_actuel_H8 END AS Futur_Prix_H8,
+        Prix_calcule_H1, Prix_calcule_H2, Prix_calcule_H3, Prix_calcule_H4, Prix_calcule_H5, Prix_calcule_H6, 
+        Prix_calcule_H7, Prix_calcule_H8, SRP_TTC, TVA
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice a
+    join vg1p-apps-optiprice-prd-a4.metier.product c on c.item_key = cast(a.code_produit as string)
+    WHERE Agregation = 'HYPER' 
+    AND Date_mercuriale = (SELECT max(Date_mercuriale) FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice)
+),
+
+mercu_l_week as (
+    SELECT Agregation, code_produit, Description_produit, Code_IFLS, Groupe_famille, c.class_key, c.class_desc, 
+    c.grp_class_key, c.grp_class_desc,
+        Date_mercuriale , Date_livraison_mercuriale, PA_Precedent, PA_Actuel, Prix_actuel_H1, Prix_actuel_H2, 
+        Prix_actuel_H3, Prix_actuel_H4, Prix_actuel_H5, 
+        Prix_actuel_H6, Prix_actuel_H7, Prix_actuel_H8,
+        CASE WHEN Prix_a_venir_H1 > 0 THEN Prix_a_venir_H1 ELSE Prix_actuel_H1 END AS Futur_Prix_H1,
+        CASE WHEN Prix_a_venir_H2 > 0 THEN Prix_a_venir_H2 ELSE Prix_actuel_H2 END AS Futur_Prix_H2,
+        CASE WHEN Prix_a_venir_H3 > 0 THEN Prix_a_venir_H3 ELSE Prix_actuel_H3 END AS Futur_Prix_H3,
+        CASE WHEN Prix_a_venir_H4 > 0 THEN Prix_a_venir_H4 ELSE Prix_actuel_H4 END AS Futur_Prix_H4,
+        CASE WHEN Prix_a_venir_H5 > 0 THEN Prix_a_venir_H5 ELSE Prix_actuel_H5 END AS Futur_Prix_H5,
+        CASE WHEN Prix_a_venir_H6 > 0 THEN Prix_a_venir_H6 ELSE Prix_actuel_H6 END AS Futur_Prix_H6,
+        CASE WHEN Prix_a_venir_H7 > 0 THEN Prix_a_venir_H7 ELSE Prix_actuel_H7 END AS Futur_Prix_H7,
+        CASE WHEN Prix_a_venir_H8 > 0 THEN Prix_a_venir_H8 ELSE Prix_actuel_H8 END AS Futur_Prix_H8,
+        Prix_calcule_H1, Prix_calcule_H2, Prix_calcule_H3, Prix_calcule_H4, Prix_calcule_H5, Prix_calcule_H6, 
+        Prix_calcule_H7, Prix_calcule_H8, SRP_TTC, TVA
+    FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice a
+    join vg1p-apps-optiprice-prd-a4.metier.product c on c.item_key = cast(a.code_produit as string)
+    WHERE Agregation = 'HYPER' 
+    AND Date_mercuriale = (SELECT  max(Date_mercuriale) - 7 FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice)
+),
+
+qty_hyper as (
+ SELECT  'HYPER' as entrepot_desc, a.class_key, a.class_desc, a.grp_class_key, a.grp_class_desc, 
+    a.item_key, a.item_desc,
+    SUM(sal_unit_qty_12m) as qty,
+    SUM(sal_amt_wtax_12m) AS ca_ttc,
+    SUM(sal_amt_xtax_12m) AS ca_ht
+    from vg1p-apps-optiprice-prd-a4.metier.product a 
+       
+    
+    join vg1p-apps-optiprice-prd-a4.metier.product_store_sales s on s.item_key = a.item_key
+       -- and date(s.timestamp) = '2023-03-26'
+    
+    join `fr-darwin-prd.sites_referential.bv_store` e on e.stoean = s.store_key 
+        AND e.chaintypeopkey = 'HYP'
+        AND e.stointflag = 'IN'
+       -- AND e.nonActiveDate is null
+        AND e.stoFinKey NOT IN ('FRA081','FRA252','FRA309','FRA321')
+    WHERE a.item_key NOT IN ('3523680252134','3523680295254','3276552530402','3276552300814','3523680355286','3523680252172','3276552313036','3523680406360','3523680252202','3523680339729','3276553775147','3276552564834','3276552250645','3276552274320','3276552269517','3276552293093','3276552413095','3276552299705','3276552310608','3276552299620','3523680338814','3276552471477','3276552564773','3276557202120','3276552313814','3276552684235','3523680355088','3276552598211','3276552313074','3523680275324','3523680335066','3276552413002','3276552454364','3276552413057','3276552250652','3276552684310','3276552251857','3276552267285','3523680248281','3276552384654','3276552269593','3276552293734','3276552639976','3276552310578','3276552640279','3523680355064','3276552293703','3523680406469','3523680355026','3276552635640','3276552684457','3523680414693','3276552275747','3276552310790','3276552267339','3523680272170','3276550252429','3276552556457','3276552611064','3276552293659','3523680355279','3276552251840','3276552269586','3276552384685','3276552275860','3276552272593','3276552253059','3523680406438','3523680339712','3276552684129','3276552507800','3276552310561','3276557511185','3276552140403','3276552267292','3523680412156','3276552384692','3276552471521','3523680248304','3276553775192','3276552293079','3276552639938','3276552299682','3523680248182','3276552647407','3276552252960','3276552292706','3276552598235','3276552647438','3276552293727','3276556789745','3276552253042','3276552272609','3276552639969','3276552268992','3523680285231','3276552287269','3276552267223','3523680257641','3276553782947','3276552249892','3276552249823','3523680355262','3276550243052','3276553475221','3523680284661','3523680414600','3276552275884','3276552293116','3523680343917','3523680390225','3276552252946','3523680339699','3276552253028','3276552598181','3276557525519','3276554606068','3276552413088','3276556959629','3523680338838','3245390176646','3276552684464','3276552293666','3523680339736','3276554606044','3523680257627','3523680248205','3276552293147','3276552398255','3276552598204','3523680406452','3523680278196','3276552300852','3523680248403','3523680295247','3523680406407','3276552310554','3276552384722','3276552247843','3523680256507','3523680414686','3523680414662','3523680414631','3276552250669','3276552556426','3276552672706','3276552272661','3523680319752','3523680252165','3523680272132','3276552413866','3276552287313','3276557511192','3276552293086','3523680355033','3523680355255','3276552672690','3523680273979','3276552301101','3276554258250','3523680272156','3276557202106','3523680248397','3523680339705','3276552517687','3276552672720','3276552251888','3276552293642','3276552299699','3276552426866','3523680295223','3276552414412','3523680344969','3276552288501','3276554606051','3523680248243','3276552250324','3523680414709','3523680272187','3276552275983','3276552250447','3276557511208','3523680406483','3276557525779','3276552292560','3276552556471','3276557225266','3523680296640','3276552251864','3523680406414','3276552684150','3523680252158','3523680347526','3523680406391','3276552484668','3276553782954','3276552496210','3523680278202','3276552312954','3523680412163','3523680343283','3276552284046','3523680295230','3523680355040','3276552275761','3276552249854','3276552275877','3276552249885','3523680394544','3276552274337','3523680256514','3276553797491','3276552250454','3276552275754','3276552384739','3276552293598','3276552456955','3276552310639','3276552670870','3276552453022','3276552284039','3276553677014','3276552517670','3276552299712','3523680355071','3276557202113','3276552611040','3523680278189','3523680252219','3276552635152','3523680406476','3276557225242','3523680256484','3276552640293','3523680390256','3276552672683','3276552635145','3276552384661','3523680278165','3523680257634','3523680284593','3523680347533','3276552598198','3276552401856','3523680344976','3523680252127','3276552292621','3523680256545','3276552247850','3523680278172','3276552249793','3523680297517','3276552670856','3276552299279','3276552250690','3276552249045','3523680273948','3523680355019','3523680252110','3276552313982','3276550269908','3276552250478','3523680343290','3276552293055','3276552293697','3276552293123','3276552313951','3523680406445','3523680304536','3276557202137','3523680272149','3523680414594','3276550298144','3276552684273','3523680252196','3276552287290','3523680414679','3276552684099','3276552411787','3276552313937','3276552440329','3276552640309','3276552252977','3276552272654','3276553775178','3523680248229','3523680345768','3276552272586','3276556959704','3523680406384','3276550403692','3276552293109','3523680295278','3276552384647','3523680414648','3276552249243','3523680248359','3276552248734','3523680414655','3523680296657','3523680355057','3276552249779','3276552251871','3523680248328','3276552556440','3276550335450','3276552672713','3523680248342','3523680414624','3276552268930','3523680424203','3276556959681','3276552598228','3276556965026','3276552384715','3276552274344','3523680269392','3276552440305','3276552413019','3276552250485','3276552413033','3523680252189','3276552310769','3276552384708','3276553775222','3276553898181','3276556959698','3523680414617','3276552413125','3276552513344','3276552250461','3276552670863','3276553976667','3276557511222','3276557225235','3523680340442','3523680256491','3276556965033','3276552293680','3276552401863','3276552293062','3523680345010','3523680272163','3523680256538','3276552299293','3276552250508','3523680256521','3276552267322','3276552300845','3523680347540','3276557448290','3276552598273','3276557448313','3523680295261','3276552293710','3523680297555','3276552250492','3523680248267','3276552269500','3276553481031','3276552299651','3523680406421','3276552310813','3523680338913','3276552250638','3276552310684','3276554258243','3523680291638','3523680406377','3523680254510','3523680254527','3523680254534','3276552313234','3276552313517','3276555040014','3276550327882','3276554060099','3276554565105','3276554565112','3523680389519','3523680396173','3276550327851','3276550148579','3276550264804','3276550328650','3276550328674','3276550328704','3276550353249','3276550353386','3276550417767','3276550443469','3276550443483','3276552848910','3276552985158','3276553023446','3276553023699','3276553691577','3276553968594','3276554579607','3276554579744','3276554579751','3276554579799','3276554581716','3276554581730','3276554581938','3276554582034','3276554582140','3276554582195','3276554582362','3276554582379','3276554582393','3276554582409','3276554582416','3276554582430','3276554582669','3276554582683','3276554584403','3276554584458','3276554584465','3276554584588','3276554584601','3276554584656','3276554585356','3276554585387','3276554820006','3276555351837','3276555792920','3276555792999','3276557766295','3276557861778','3276557892925','3276557914580','3276558262147','3276558885261','3276558930596','3276559446560','3276559446577','3276559544006','3523680254190','3523680284487','3523680297494','3523680319721','3523680323520','3523680377288','3523680383852','3523680394155','3523680401112','3523680412545','3523680427846','3523680430273','3523680430532','3523680436749','3523680443389','3523680443396','3276550443285','3276554585363','3276554585394','3523680237520','3276550149071','3276550237334','3276554580788','3276557247015')
+        AND a.department_key = '22'
+        AND a.grp_class_key NOT IN ('224', '226', '228','229')
+        AND a.class_key NOT IN ('2251', '2252', '2253')
+    GROUP BY a.class_key, a.class_desc, a.grp_class_key, a.grp_class_desc, 
+    a.item_key, a.item_desc
+),
+
+qty_an as (
+  SELECT a.item_key, 
+     SUM(sal_unit_qty_12m) as qty_total,
+    SUM(sal_amt_wtax_12m) AS ca_ttc_total,
+    SUM(sal_amt_xtax_12m) AS ca_ht_total
+    from vg1p-apps-optiprice-prd-a4.metier.product a
+     join vg1p-apps-optiprice-prd-a4.metier.product_store_sales s on s.item_key = a.item_key
+
+    
+    join `fr-darwin-prd.sites_referential.bv_store` e on e.stoean = s.store_key 
+        AND e.chaintypeopkey = 'HYP'
+        AND e.stointflag = 'IN'
+        --AND e.nonActiveDate is null
+        where e.stoFinKey NOT IN ('FRA081','FRA252','FRA309','FRA321')
+        AND a.department_key = '22'
+        AND a.grp_class_key NOT IN ('224', '226', '228','229')
+        AND a.class_key NOT IN ('2251', '2252', '2253')
+        group by a.item_key
+),
+
+cle_barcode as (
+SELECT  cle_tvs, cast(barcode as string) as barcode
+    FROM (
+        SELECT  cle_tvs, barcode_achat as barcode
+        FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.PFT_TEMP_BIBLIO_R22
+        WHERE cle_tvs is not null
+        GROUP BY cle_tvs, barcode_achat
+
+        union distinct
+
+        SELECT  cle_tvs, barcode_vente
+        FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.PFT_TEMP_BIBLIO_R22
+        WHERE cle_tvs is not null
+        GROUP BY cle_tvs, barcode_vente ) 
+        WHERE CAST(barcode as INTEGER) not in (3523680252134,3523680295254,3276552530402,3276552300814,3523680355286,3523680252172,3276552313036,3523680406360,3523680252202,3523680339729,3276553775147,3276552564834,3276552250645,3276552274320,3276552269517,3276552293093,3276552413095,3276552299705,3276552310608,3276552299620,3523680338814,3276552471477,3276552564773,3276557202120,3276552313814,3276552684235,3523680355088,3276552598211,3276552313074,3523680275324,3523680335066,3276552413002,3276552454364,3276552413057,3276552250652,3276552684310,3276552251857,3276552267285,3523680248281,3276552384654,3276552269593,3276552293734,3276552639976,3276552310578,3276552640279,3523680355064,3276552293703,3523680406469,3523680355026,3276552635640,3276552684457,3523680414693,3276552275747,3276552310790,3276552267339,3523680272170,3276550252429,3276552556457,3276552611064,3276552293659,3523680355279,3276552251840,3276552269586,3276552384685,3276552275860,3276552272593,3276552253059,3523680406438,3523680339712,3276552684129,3276552507800,3276552310561,3276557511185,3276552140403,3276552267292,3523680412156,3276552384692,3276552471521,3523680248304,3276553775192,3276552293079,3276552639938,3276552299682,3523680248182,3276552647407,3276552252960,3276552292706,3276552598235,3276552647438,3276552293727,3276556789745,3276552253042,3276552272609,3276552639969,3276552268992,3523680285231,3276552287269,3276552267223,3523680257641,3276553782947,3276552249892,3276552249823,3523680355262,3276550243052,3276553475221,3523680284661,3523680414600,3276552275884,3276552293116,3523680343917,3523680390225,3276552252946,3523680339699,3276552253028,3276552598181,3276557525519,3276554606068,3276552413088,3276556959629,3523680338838,3245390176646,3276552684464,3276552293666,3523680339736,3276554606044,3523680257627,3523680248205,3276552293147,3276552398255,3276552598204,3523680406452,3523680278196,3276552300852,3523680248403,3523680295247,3523680406407,3276552310554,3276552384722,3276552247843,3523680256507,3523680414686,3523680414662,3523680414631,3276552250669,3276552556426,3276552672706,3276552272661,3523680319752,3523680252165,3523680272132,3276552413866,3276552287313,3276557511192,3276552293086,3523680355033,3523680355255,3276552672690,3523680273979,3276552301101,3276554258250,3523680272156,3276557202106,3523680248397,3523680339705,3276552517687,3276552672720,3276552251888,3276552293642,3276552299699,3276552426866,3523680295223,3276552414412,3523680344969,3276552288501,3276554606051,3523680248243,3276552250324,3523680414709,3523680272187,3276552275983,3276552250447,3276557511208,3523680406483,3276557525779,3276552292560,3276552556471,3276557225266,3523680296640,3276552251864,3523680406414,3276552684150,3523680252158,3523680347526,3523680406391,3276552484668,3276553782954,3276552496210,3523680278202,3276552312954,3523680412163,3523680343283,3276552284046,3523680295230,3523680355040,3276552275761,3276552249854,3276552275877,3276552249885,3523680394544,3276552274337,3523680256514,3276553797491,3276552250454,3276552275754,3276552384739,3276552293598,3276552456955,3276552310639,3276552670870,3276552453022,3276552284039,3276553677014,3276552517670,3276552299712,3523680355071,3276557202113,3276552611040,3523680278189,3523680252219,3276552635152,3523680406476,3276557225242,3523680256484,3276552640293,3523680390256,3276552672683,3276552635145,3276552384661,3523680278165,3523680257634,3523680284593,3523680347533,3276552598198,3276552401856,3523680344976,3523680252127,3276552292621,3523680256545,3276552247850,3523680278172,3276552249793,3523680297517,3276552670856,3276552299279,3276552250690,3276552249045,3523680273948,3523680355019,3523680252110,3276552313982,3276550269908,3276552250478,3523680343290,3276552293055,3276552293697,3276552293123,3276552313951,3523680406445,3523680304536,3276557202137,3523680272149,3523680414594,3276550298144,3276552684273,3523680252196,3276552287290,3523680414679,3276552684099,3276552411787,3276552313937,3276552440329,3276552640309,3276552252977,3276552272654,3276553775178,3523680248229,3523680345768,3276552272586,3276556959704,3523680406384,3276550403692,3276552293109,3523680295278,3276552384647,3523680414648,3276552249243,3523680248359,3276552248734,3523680414655,3523680296657,3523680355057,3276552249779,3276552251871,3523680248328,3276552556440,3276550335450,3276552672713,3523680248342,3523680414624,3276552268930,3523680424203,3276556959681,3276552598228,3276556965026,3276552384715,3276552274344,3523680269392,3276552440305,3276552413019,3276552250485,3276552413033,3523680252189,3276552310769,3276552384708,3276553775222,3276553898181,3276556959698,3523680414617,3276552413125,3276552513344,3276552250461,3276552670863,3276553976667,3276557511222,3276557225235,3523680340442,3523680256491,3276556965033,3276552293680,3276552401863,3276552293062,3523680345010,3523680272163,3523680256538,3276552299293,3276552250508,3523680256521,3276552267322,3276552300845,3523680347540,3276557448290,3276552598273,3276557448313,3523680295261,3276552293710,3523680297555,3276552250492,3523680248267,3276552269500,3276553481031,3276552299651,3523680406421,3276552310813,3523680338913,3276552250638,3276552310684,3276554258243,3523680291638,3523680406377,3523680254510,3523680254527,3523680254534,3276552313234,3276552313517,3276555040014,3276550327882,3276554060099,3276554565105,3276554565112,3523680389519,3523680396173,3276550327851,3276550148579,3276550264804,3276550328650,3276550328674,3276550328704,3276550353249,3276550353386,3276550417767,3276550443469,3276550443483,3276552848910,3276552985158,3276553023446,3276553023699,3276553691577,3276553968594,3276554579607,3276554579744,3276554579751,3276554579799,3276554581716,3276554581730,3276554581938,3276554582034,3276554582140,3276554582195,3276554582362,3276554582379,3276554582393,3276554582409,3276554582416,3276554582430,3276554582669,3276554582683,3276554584403,3276554584458,3276554584465,3276554584588,3276554584601,3276554584656,3276554585356,3276554585387,3276554820006,3276555351837,3276555792920,3276555792999,3276557766295,3276557861778,3276557892925,3276557914580,3276558262147,3276558885261,3276558930596,3276559446560,3276559446577,3276559544006,3523680254190,3523680284487,3523680297494,3523680319721,3523680323520,3523680377288,3523680383852,3523680394155,3523680401112,3523680412545,3523680427846,3523680430273,3523680430532,3523680436749,3523680443389,3523680443396,3276550443285,3276554585363,3276554585394,3523680237520,3276550149071,3276550237334,3276554580788,3276557247015)
+        GROUP BY cle_tvs, barcode
+
+), 
+
+qty_tvs as (
+     SELECT  cle_tvs, sum(distinct qty_total) as qty_tvs_12_mois,
+    sum(distinct ca_ht_total) as ca_ht_tvs_12_mois, sum(distinct ca_ttc_total) as ca_ttc_tvs_12_mois
+    FROM cle_barcode a
+    JOIN qty_an q on a.barcode = q.item_key
+    GROUP BY CLE_TVS
+),
+
+prix_moyen_marche as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_marche, count(*) as detention_marche
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE <> 'CARREFOUR HYPERMARCHE'
+        AND GROUPE_ENSEIGNE <> 'CARREFOUR SUPERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_LC as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_LC, count(*) as detention_LC
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND (GROUPE_ENSEIGNE = 'LECLERC' or GROUPE_ENSEIGNE = 'CENTRE LECLERC')
+    GROUP BY ref_produit
+),
+
+prix_moyen_ITM as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_ITM, count(*) as detention_ITM
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'INTERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_GA as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_GA, count(*) as detention_GA
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'CARREFOUR SUPERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_CRF as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_CRF, count(*) as detention_CRF
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'CARREFOUR HYPERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_modal_lidl as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_lidl, detention_modal_lidl FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_lidl,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE = 'LIDL'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_lidl
+),
+
+prix_modal_GF as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_GF, detention_modal_GF FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_GF,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE = 'GRAND FRAIS'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_GF
+),
+
+prix_modal_LC as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_LC, detention_modal_LC FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_LC,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE IN ('CENTRE LECLERC','LECLERC')
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_LC
+),
+
+prix_modal_ITM as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_ITM, detention_modal_ITM FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_ITM,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE = 'INTERMARCHE'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_ITM
+),
+
+prix_modal_u as (
+    SELECT ref_produit, prix_de_vente as prix_modal_u, detention_modal_u FROM (
+        SELECT ref_produit, prix_de_vente, count(*) as detention_modal_u,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE = 'U'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_u
+),
+
+prix_moyen_U as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_U, count(*) as detention_U
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'U'
+    GROUP BY ref_produit
+),
+
+prix_moyen_LIDL as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_LIDL, count(*) as detention_LIDL
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'LIDL'
+    GROUP BY ref_produit
+),
+
+prix_moyen_GF as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_GF, count(*) as detention_GF
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'GRAND FRAIS'
+    GROUP BY ref_produit
+),
+
+prix_moyen_BIOCOOP as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_BIOCOOP, count(*) as detention_BIOCOOP
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'BIOCOOP'
+    GROUP BY ref_produit
+),
+
+prix_moyen_LAVIECLAIRE as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_LAVIECLAIRE, count(*) as detention_LAVIECLAIRE
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'LA VIE CLAIRE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_NATURALIA as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_NATURALIA, count(*) as detention_NATURALIA
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'NATURALIA'
+    GROUP BY ref_produit
+),
+
+prix_modal_auchan as (
+    SELECT ref_produit, prix_de_vente as prix_modal_auchan, detention_modal_auchan FROM (
+        SELECT ref_produit, prix_de_vente, count(*) as detention_modal_auchan,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '1'
+            AND GROUPE_ENSEIGNE = 'GROUPE AUCHAN'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_auchan
+),
+prix_moyen_auchan as (
+    SELECT ref_produit, round(avg(prix_de_vente),2) as prix_moyen_auchan, count(*) as detention_auchan
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '1'
+        AND GROUPE_ENSEIGNE = 'GROUPE AUCHAN'
+    GROUP BY ref_produit
+),
+
+prix_moyen_auchan_last_week as (
+    SELECT ref_produit, round(avg(prix_de_vente),2) as prix_moyen_auchan_lw, count(*) as detention_auchan_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+   WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'GROUPE AUCHAN'
+    GROUP BY ref_produit
+),
+
+prix_moyen_marche_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_marche_lw, count(*) as detention_marche_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE <> 'CARREFOUR HYPERMARCHE'
+        AND GROUPE_ENSEIGNE <> 'CARREFOUR SUPERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_LC_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_LC_lw, count(*) as detention_LC_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND (GROUPE_ENSEIGNE = 'LECLERC'or GROUPE_ENSEIGNE = 'CENTRE LECLERC')
+    GROUP BY ref_produit
+),
+
+prix_moyen_ITM_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_ITM_lw, count(*) as detention_ITM_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+   WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'INTERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_GA_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_GA_lw, count(*) as detention_GA_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'CARREFOUR SUPERMARCHE'
+    GROUP BY ref_produit
+),
+
+prix_modal_lidl_last_week as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_lidl_lw, detention_modal_lidl_lw FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_lidl_lw,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '2'
+            AND GROUPE_ENSEIGNE = 'LIDL'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_lidl_lw
+),
+
+prix_modal_GF_last_week as (
+    SELECT  ref_produit, prix_de_vente as prix_modal_GF_lw, detention_modal_GF_lw FROM (
+        SELECT  ref_produit, prix_de_vente, count(*) as detention_modal_GF_lw,
+        ROW_NUMBER () OVER (PARTITION BY ref_produit ORDER BY count(*) DESC, prix_de_vente DESC) RANG
+        FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+        WHERE vague = '2'
+            AND GROUPE_ENSEIGNE = 'GRAND FRAIS'
+        GROUP BY ref_produit, prix_de_vente
+    ) WHERE RANG = 1
+    GROUP BY ref_produit, prix_de_vente, detention_modal_GF_lw
+),
+
+prix_moyen_U_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_U_lw, count(*) as detention_U_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'U'
+    GROUP BY ref_produit
+),
+
+prix_moyen_BIOCOOP_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_BIOCOOP_lw, count(*) as detention_BIOCOOP_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'BIOCOOP'
+    GROUP BY ref_produit
+),
+
+prix_moyen_LAVIECLAIRE_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_LAVIECLAIRE_lw, count(*) as detention_LAVIECLAIRE_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'LA VIE CLAIRE'
+    GROUP BY ref_produit
+),
+
+prix_moyen_NATURALIA_last_week as (
+    SELECT  ref_produit, round(avg(prix_de_vente),2) as prix_moyen_NATURALIA_lw, count(*) as detention_NATURALIA_lw
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data
+    WHERE vague = '2'
+        AND GROUPE_ENSEIGNE = 'NATURALIA'
+    GROUP BY ref_produit
+),
+
+raccro_mercu as (
+   SELECT  cle_tvs, poids_crf, poids_tvs, sensi_tvs FROM (
+        SELECT  Date_mercuriale , cle_tvs, Code_IFLS, poids_crf, poids_tvs, 
+        DENSE_RANK () OVER (PARTITION BY cle_tvs ORDER BY Date_mercuriale DESC, sensi_tvs DESC, poids_crf DESC) RANG,
+        CASE WHEN sensi_tvs = '-' THEN sensibilite ELSE sensi_tvs END AS sensi_tvs
+        FROM vg1p-apps-pricingkf-prd01-52.erwan_bringer.pft_mercu_optiprice a
+        JOIN vg1p-apps-pricingkf-prd01-52.erwan_bringer.PFT_TEMP_BIBLIO_R22 b on cast(a.Code_IFLS as string) = b.ifls_achat
+        WHERE Agregation = 'HYPER'
+           and cle_tvs is not null
+        ORDER BY Date_mercuriale DESC 
+        ) 
+    WHERE RANG = 1
+    GROUP BY cle_tvs, poids_crf, poids_tvs, sensi_tvs
+)
+
+    SELECT  a.Agregation, a.code_produit, a.Description_produit, a.Code_IFLS, rm.sensi_tvs,
+    code_groupe_de_famille, lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille,
+    a.Date_mercuriale , a.Date_livraison_mercuriale, 
+    CASE 
+        WHEN a.Agregation = 'HYPER' then 'PA National' 
+        WHEN a.PA_Precedent is null AND a.PA_Actuel is null then 'PA National'
+        ELSE 'PA Entrepôt'
+    END AS Origine_PA,
+    CASE 
+        WHEN a.PA_Precedent is null AND a.PA_Actuel is null then b.PA_Precedent
+        ELSE a.PA_Precedent
+    END AS PA_precedent,
+    CASE 
+        WHEN a.PA_Precedent is null AND a.PA_Actuel is null then b.PA_Actuel
+        ELSE a.PA_Actuel
+    END AS Pa_Actuel,
+    CASE 
+        WHEN a.PA_Precedent is null AND a.PA_Actuel is null then (b.PA_Actuel - b.PA_Precedent)/ nullif(b.PA_Precedent,0)
+        ELSE (a.PA_Actuel - a.PA_Precedent)/ nullif(a.PA_Precedent,0)
+    END AS Evolution_PA,
+    CASE 
+        WHEN a.Agregation = 'HYPER' then 'PA National' 
+        WHEN w.PA_Actuel is null then 'PA National'
+        ELSE 'PA Entrepôt'
+    END AS Origine_PA_Actuel_l_week,
+    CASE 
+        WHEN w.PA_Actuel is null then wh.PA_Actuel
+        ELSE w.PA_Actuel
+    END AS PA_Actuel_l_week,
+    CASE 
+        WHEN a.Agregation = 'HYPER' then 'Prix National' 
+        WHEN w.Prix_actuel_H4 is null then 'Prix National'
+        ELSE 'Prix Entrepôt'
+    END AS Origine_Prix_H4_l_week,
+    CASE 
+        WHEN w.Prix_actuel_H4 is null then wh.Prix_actuel_H4
+        ELSE w.Prix_actuel_H4
+    END AS Prix_actuel_H4_l_week,
+    CASE 
+        WHEN a.Agregation = 'HYPER' then 'Prix National' 
+        WHEN a.Prix_actuel_H1 is null then 'Prix National'
+        ELSE 'Prix Entrepôt'
+    END AS Origine_Prix_Actuel,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H1
+        ELSE a.Prix_actuel_H1
+    END AS Prix_actuel_H1,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H2
+        ELSE a.Prix_actuel_H2
+    END AS Prix_actuel_H2,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H3
+        ELSE a.Prix_actuel_H3
+    END AS Prix_actuel_H3,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H4
+        ELSE a.Prix_actuel_H4
+    END AS Prix_actuel_H4,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H5
+        ELSE a.Prix_actuel_H5
+    END AS Prix_actuel_H5,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H6
+        ELSE a.Prix_actuel_H6
+    END AS Prix_actuel_H6,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H7
+        ELSE a.Prix_actuel_H7
+    END AS Prix_actuel_H7,
+    CASE 
+        WHEN a.Prix_actuel_H1 is null then b.Prix_actuel_H8
+        ELSE a.Prix_actuel_H8
+    END AS Prix_actuel_H8,
+    CASE 
+        WHEN a.Agregation = 'HYPER' then 'Prix National' 
+        WHEN a.Futur_Prix_H1 is null then 'Prix National'
+        ELSE 'Prix Entrepôt'
+    END AS Origine_Prix_futur,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H1
+        ELSE a.Futur_Prix_H1
+    END AS Prix_futur_H1,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H2
+        ELSE a.Futur_Prix_H2
+    END AS Prix_futur_H2,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H3
+        ELSE a.Futur_Prix_H3
+    END AS Prix_futur_H3,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H4
+        ELSE a.Futur_Prix_H4
+    END AS Prix_futur_H4,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H5
+        ELSE a.Futur_Prix_H5
+    END AS Prix_futur_H5,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H6
+        ELSE a.Futur_Prix_H6
+    END AS Prix_futur_H6,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H7
+        ELSE a.Futur_Prix_H7
+    END AS Prix_futur_H7,
+    CASE 
+        WHEN a.Futur_Prix_H1 is null then b.Futur_Prix_H8
+        ELSE a.Futur_Prix_H8
+    END AS Prix_futur_H8,
+    a.Prix_calcule_H1, a.Prix_calcule_H2, a.Prix_calcule_H3, a.Prix_calcule_H4, a.Prix_calcule_H5, a.Prix_calcule_H6, 
+    a.Prix_calcule_H7, a.Prix_calcule_H8,
+    rm.poids_crf, rm.poids_tvs, 
+    CASE 
+        WHEN qty.qty = q.qty THEN qty.qty
+        WHEN qty.qty IS NOT NULL AND q.qty IS NOT NULL THEN qty.qty + q.qty
+        WHEN qty.qty IS NOT NULL THEN qty.qty
+        ELSE q.qty
+    END AS quantites_total, 
+    CASE 
+        WHEN qty.ca_ht = q.ca_ht THEN qty.ca_ht
+        WHEN qty.ca_ht IS NOT NULL AND q.ca_ht IS NOT NULL THEN qty.ca_ht + q.ca_ht
+        WHEN qty.ca_ht IS NOT NULL THEN qty.ca_ht
+        ELSE q.ca_ht
+    END AS ca_ht_total, 
+    CASE 
+        WHEN qty.ca_ttc = q.ca_ttc THEN qty.ca_ttc
+        WHEN qty.ca_ttc IS NOT NULL AND q.ca_ttc IS NOT NULL THEN qty.ca_ttc + q.ca_ttc
+        WHEN qty.ca_ttc IS NOT NULL THEN qty.ca_ttc
+        ELSE q.ca_ttc
+    END AS ca_ttc_total, 
+    bd.ref_produit as ref_produit, bd.lib_produit as libelle_article, 
+  
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_marche * rm.poids_crf /nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_marche
+    END as prix_moyen_marche,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_GF * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_GF
+    END as prix_moyen_GF,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_LC * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_LC
+    END as prix_moyen_LC,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_ITM * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_ITM
+    END as prix_moyen_ITM,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_GA * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_GA
+    END as prix_moyen_GA,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_CRF * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_CRF
+    END as prix_moyen_CRF,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_lidl * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_lidl
+    END as prix_moyen_lidl, 
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_lidl * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_lidl
+    END as prix_modal_lidl,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_GF * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_GF
+    END as prix_modal_GF,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_U * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_U
+    END as prix_moyen_U,
+
+
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_u * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_u
+    END as prix_modal_u,
+     CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_auchan * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_auchan
+    END as prix_moyen_auchan,
+
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_auchan_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_auchan_lw
+    END as prix_moyen_auchan_lw,
+
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_auchan * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_auchan
+    END as prix_modal_auchan,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_BIOCOOP * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_BIOCOOP
+    END as prix_moyen_BIOCOOP,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_LAVIECLAIRE * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_LAVIECLAIRE
+    END as prix_moyen_LAVIECLAIRE,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_NATURALIA * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_NATURALIA
+    END as prix_moyen_NATURALIA,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_marche_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_marche_lw
+    END as prix_moyen_marche_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_LC_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_LC_lw
+    END as prix_moyen_LC_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_ITM_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_ITM_lw
+    END as prix_moyen_ITM_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_GA_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_GA_lw
+    END as prix_moyen_GA_lw,    
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_lidl_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_lidl_lw
+    END as prix_modal_lidl_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_GF_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_GF_lw
+    END as prix_modal_GF_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_moyen_U_lw * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_moyen_U_lw
+    END as prix_moyen_U_lw,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_LC * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_LC
+    END as prix_modal_LC,
+    CASE 
+        WHEN rm.poids_crf > 0 and rm.poids_tvs > 0 then round(prix_modal_ITM * rm.poids_crf / nullif(rm.poids_tvs,0),2)
+        ELSE prix_modal_ITM
+    END as prix_modal_ITM,
+    detention_marche, detention_modal_lidl, detention_lidl, detention_GF, detention_modal_GF, detention_LC, detention_ITM, detention_CRF,
+    detention_GA, detention_modal_u, detention_U, detention_modal_auchan , detention_auchan , detention_BIOCOOP, 
+    detention_LAVIECLAIRE, detention_NATURALIA, a.SRP_TTC, a.TVA, detention_modal_LC, detention_modal_ITM,
+    qty_tvs_12_mois, ca_ht_tvs_12_mois, ca_ttc_tvs_12_mois
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.base_data bd
+    JOIN vg1p-apps-pricingkf-prd01-52.erwan_bringer.PFT_TEMP_BIBLIO_R22 br on bd.ref_produit = CAST(br.cle_tvs as STRING)
+    LEFT JOIN raccro_mercu rm on rm.cle_tvs = br.cle_tvs
+    LEFT JOIN last_mercus a on a.Code_IFLS =cast(br.IFLS_ACHAT as integer)
+    LEFT JOIN qty_hyper qty on qty.item_key = cast(br.barcode_vente as string) and a.Agregation = qty.entrepot_desc
+    LEFT JOIN qty_hyper q on q.item_key = cast(br.BARCODE_ACHAT as string) and a.Agregation = q.entrepot_desc
+    LEFT JOIN last_mercus b on a.Code_IFLS = b.Code_IFLS and a.Date_mercuriale = b.Date_mercuriale
+        AND b.Agregation = 'HYPER'
+    LEFT JOIN mercu_l_week w on a.Code_IFLS = w.Code_IFLS and a.Agregation = w.Agregation 
+    LEFT JOIN mercu_l_week wh on a.Code_IFLS = wh.Code_IFLS
+        AND wh.Agregation = 'HYPER'
+
+    LEFT JOIN prix_moyen_marche d on D.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+    LEFT JOIN prix_moyen_LIDL e on e.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_LIDL > 2
+    LEFT JOIN prix_moyen_LC f on f.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_LC > 2
+    LEFT JOIN prix_moyen_ITM g on g.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_ITM > 2
+    LEFT JOIN prix_moyen_GF j on j.REF_PRODUIT =CAST(br.cle_tvs as STRING)
+        AND detention_GF > 2
+    LEFT JOIN prix_moyen_GA m on m.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_GA > 2
+    LEFT JOIN prix_modal_lidl h on h.REF_PRODUIT =CAST(br.cle_tvs as STRING)
+        AND detention_modal_lidl > 2
+    LEFT JOIN prix_modal_GF i on i.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_modal_GF > 2
+    LEFT JOIN prix_moyen_U l on l.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_U > 2
+    LEFT JOIN prix_modal_U lz on lz.REF_PRODUIT = br.cle_tvs
+        AND detention_modal_u > 2
+    LEFT JOIN prix_moyen_auchan lp on lp.REF_PRODUIT = br.cle_tvs
+        AND detention_auchan > 2
+
+    LEFT JOIN prix_modal_auchan lzp on lzp.REF_PRODUIT = br.cle_tvs
+        AND detention_modal_auchan > 2
+
+    LEFT JOIN prix_moyen_auchan_last_week sp on sp.REF_PRODUIT = br.cle_tvs
+        AND detention_auchan_lw > 2
+
+    LEFT JOIN prix_moyen_BIOCOOP lr on lr.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_BIOCOOP >= 1
+    LEFT JOIN prix_moyen_LAVIECLAIRE lv on lv.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_LAVIECLAIRE >= 1
+    LEFT JOIN prix_moyen_NATURALIA ls on ls.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_NATURALIA >= 1
+    LEFT JOIN prix_moyen_CRF crf on crf.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_CRF > 2
+    LEFT JOIN prix_moyen_marche_last_week mo on mo.REF_PRODUIT =CAST(br.cle_tvs as STRING)
+    LEFT JOIN prix_moyen_LC_last_week n on n.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_LC_lw > 2
+    LEFT JOIN prix_moyen_ITM_last_week o on o.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_ITM_lw > 2
+    LEFT JOIN prix_moyen_GA_last_week p on p.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_GA_lw > 2
+    LEFT JOIN prix_modal_lidl_last_week t on t.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_modal_lidl_lw > 2
+    LEFT JOIN prix_modal_GF_last_week r on r.REF_PRODUIT =CAST(br.cle_tvs as STRING)
+        AND detention_modal_GF_lw > 2
+    LEFT JOIN prix_moyen_U_last_week s on s.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_U_lw > 2
+    LEFT JOIN prix_modal_LC tt on tt.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_modal_LC > 2 
+    LEFT JOIN prix_modal_ITM u on u.REF_PRODUIT = CAST(br.cle_tvs as STRING)
+        AND detention_modal_ITM > 2   
+    left join qty_tvs uy on uy.cle_tvs =br.cle_tvs
+    GROUP BY a.Agregation, a.code_produit, a.Description_produit, a.Code_IFLS, a.Groupe_famille, rm.sensi_tvs,
+    a.Date_mercuriale , a.Date_livraison_mercuriale, a.PA_Precedent, a.PA_Actuel, w.PA_Actuel, wh.PA_Actuel, w.Futur_Prix_H1, a.Prix_actuel_H1, a.Prix_actuel_H2, a.Prix_actuel_H3, 
+    a.Prix_actuel_H4, a.Prix_actuel_H5, a.Prix_actuel_H6, a.Prix_actuel_H7, a.Prix_actuel_H8, a.Futur_Prix_H1, a.Futur_Prix_H2, a.Futur_Prix_H3, 
+    a.Futur_Prix_H4, a.Futur_Prix_H5, a.Futur_Prix_H6, a.Futur_Prix_H7, a.Futur_Prix_H8, 
+    rm.poids_crf, rm.poids_tvs, qty.qty, q.qty, qty.ca_ht, q.ca_ht, qty.ca_ttc, q.ca_ttc, w.Prix_actuel_H4, wh.Prix_actuel_H4,
+    b.PA_Precedent, b.PA_Actuel, b.Prix_actuel_H1, b.Prix_actuel_H2, b.Prix_actuel_H3, 
+    b.Prix_actuel_H4, b.Prix_actuel_H5, b.Prix_actuel_H6, b.Prix_actuel_H7, b.Prix_actuel_H8, b.Futur_Prix_H1, b.Futur_Prix_H2, b.Futur_Prix_H3, 
+    b.Futur_Prix_H4, b.Futur_Prix_H5, b.Futur_Prix_H6, b.Futur_Prix_H7, b.Futur_Prix_H8,
+    code_groupe_de_famille,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, bd.ref_produit, bd.lib_produit, br.cle_tvs,
+    prix_moyen_marche, detention_marche, prix_modal_lidl, detention_lidl, detention_modal_lidl, detention_GF, prix_modal_GF, 
+    detention_modal_GF, prix_moyen_LC, detention_LC, prix_moyen_ITM, detention_ITM, 
+    prix_moyen_GA, prix_moyen_U, detention_GA, detention_U, prix_moyen_GF, prix_moyen_CRF, prix_moyen_lidl, detention_CRF,
+    a.Prix_calcule_H1, a.Prix_calcule_H2, a.Prix_calcule_H3, a.Prix_calcule_H4, a.Prix_calcule_H5, a.Prix_calcule_H6, 
+    a.Prix_calcule_H7, a.Prix_calcule_H8, a.SRP_TTC, a.TVA, prix_moyen_marche_lw, prix_moyen_LC_lw, 
+    prix_moyen_ITM_lw, prix_moyen_GA_lw, prix_modal_lidl_lw, prix_modal_GF_lw, prix_moyen_U_lw,
+    prix_modal_LC, detention_modal_LC, prix_modal_ITM, detention_modal_ITM, detention_BIOCOOP, detention_LAVIECLAIRE, detention_NATURALIA,
+    prix_moyen_BIOCOOP, prix_moyen_LAVIECLAIRE ,prix_moyen_NATURALIA,prix_modal_u,detention_modal_u,prix_moyen_u_lw,
+    prix_modal_auchan, detention_modal_auchan, prix_moyen_auchan, detention_auchan, prix_moyen_auchan_lw , detention_auchan_lw,
+    qty_tvs_12_mois, ca_ht_tvs_12_mois, ca_ttc_tvs_12_mois
+    ORDER BY a.Agregation, br.cle_tvs
+
+;
+
+With ranking_temp as (
+    SELECT  code_groupe_de_famille, lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille,
+    ref_produit, libelle_article, sensi_tvs, avg(PA_precedent) as PA_precedent, 
+    (SELECT AVG(PA_Actuel)
+    FROM (
+    SELECT tu.ref_produit, t.PA_Actuel
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join tu
+    INNER JOIN vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join t ON tu.ref_produit = t.ref_produit
+    INNER JOIN vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join tu2 ON tu.ref_produit = tu2.ref_produit
+    INNER JOIN vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join t2 ON tu2.ref_produit = t2.ref_produit
+    GROUP BY tu.ref_produit, t.PA_Actuel
+    HAVING SUM(CASE WHEN t.PA_Actuel = t2.PA_Actuel THEN 1 ELSE 0 END) >= ABS(SUM(SIGN(t.PA_Actuel - t2.PA_Actuel)))
+    ) tmp where tmp.ref_produit = a.ref_produit) AS PA_Actuel, max(SRP_TTC) as SRP_TTC, max(TVA) as TVA,
+    min(Prix_futur_H1) as Prix_futur_H1, min(Prix_futur_H2) as Prix_futur_H2, min(Prix_futur_H3) as Prix_futur_H3, 
+    min(Prix_futur_H4) as Prix_futur_H4, min(Prix_futur_H5) as Prix_futur_H5,min(Prix_futur_H6) as Prix_futur_H6,min(Prix_futur_H7) as Prix_futur_H7,
+    poids_crf, poids_tvs, 
+    CASE 
+        WHEN sum(distinct quantites_total) > 0 THEN sum(distinct ca_ttc_total) / nullif(sum(distinct quantites_total),0) 
+        ELSE null
+    END AS prix_moyen_veille, 
+    qty_tvs_12_mois, ca_ttc_tvs_12_mois, ca_ht_tvs_12_mois, 
+    prix_moyen_marche, detention_marche, 
+    CASE
+        WHEN prix_moyen_marche_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_marche_lw > prix_moyen_marche then 'Baisse'
+        WHEN prix_moyen_marche_lw < prix_moyen_marche then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_Marche,
+    CASE
+        WHEN prix_moyen_marche_lw is null then null
+        ELSE prix_moyen_marche - prix_moyen_marche_lw 
+    END AS Delta_Marche,
+    prix_modal_lidl_lw,
+    prix_modal_lidl, detention_modal_lidl, detention_lidl, prix_moyen_CRF, prix_moyen_lidl, detention_CRF,
+    CASE
+        WHEN prix_modal_lidl_lw is null then 'Pas de prix précédent' 
+        WHEN prix_modal_lidl_lw > prix_modal_lidl then 'Baisse'
+        WHEN prix_modal_lidl_lw < prix_modal_lidl then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_LIDL,
+    prix_modal_GF_lw,
+    CASE
+        WHEN prix_modal_lidl_lw is null then null
+        ELSE prix_modal_lidl - prix_modal_lidl_lw 
+    END AS Delta_LIDL,
+    prix_modal_GF, detention_modal_GF, detention_GF, prix_moyen_GF,
+    CASE
+        WHEN prix_modal_GF_lw is null then 'Pas de prix précédent' 
+        WHEN prix_modal_GF_lw > prix_modal_GF then 'Baisse'
+        WHEN prix_modal_GF_lw < prix_modal_GF then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_GF,
+    CASE
+        WHEN prix_modal_GF_lw is null then null
+        ELSE prix_modal_GF - prix_modal_GF_lw 
+    END AS Delta_GF,
+    prix_moyen_LC_lw,
+    prix_moyen_LC, detention_LC, 
+    CASE
+        WHEN prix_moyen_LC_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_LC_lw > prix_moyen_LC then 'Baisse'
+        WHEN prix_moyen_LC_lw < prix_moyen_LC then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_LC,
+    CASE
+        WHEN prix_moyen_LC_lw is null then null
+        ELSE prix_moyen_LC - prix_moyen_LC_lw 
+    END AS Delta_LC,
+    prix_moyen_ITM_lw,
+    prix_moyen_ITM, detention_ITM, 
+    CASE
+        WHEN prix_moyen_ITM_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_ITM_lw > prix_moyen_ITM then 'Baisse'
+        WHEN prix_moyen_ITM_lw < prix_moyen_ITM then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_ITM,
+    CASE
+        WHEN prix_moyen_ITM_lw is null then null
+        ELSE prix_moyen_ITM - prix_moyen_ITM_lw 
+    END AS Delta_ITM,
+prix_moyen_auchan_lw,
+    prix_moyen_auchan, detention_auchan, 
+    CASE
+        WHEN prix_moyen_auchan_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_auchan_lw > prix_moyen_auchan then 'Baisse'
+        WHEN prix_moyen_auchan_lw < prix_moyen_auchan then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_auchan,
+    CASE
+        WHEN prix_moyen_auchan_lw is null then null
+        ELSE prix_moyen_auchan - prix_moyen_auchan_lw 
+    END AS Delta_auchan,
+
+    prix_moyen_U, detention_U, prix_modal_u,detention_modal_u,prix_moyen_u_lw,
+    CASE
+        WHEN prix_moyen_U_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_U_lw > prix_moyen_U then 'Baisse'
+        WHEN prix_moyen_U_lw < prix_moyen_U then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_U,
+    CASE
+        WHEN prix_moyen_U_lw is null then null
+        ELSE prix_moyen_U - prix_moyen_U_lw 
+    END AS Delta_U,
+
+    prix_moyen_GA, detention_GA,
+    CASE
+        WHEN prix_moyen_GA_lw is null then 'Pas de prix précédent' 
+        WHEN prix_moyen_GA_lw > prix_moyen_GA then 'Baisse'
+        WHEN prix_moyen_GA_lw < prix_moyen_GA then 'Hausse'
+        Else 'Pas de chgt'
+    END AS Hausse_Baisse_GA,
+    CASE
+        WHEN prix_moyen_GA_lw is null then null
+        ELSE prix_moyen_GA - prix_moyen_GA_lw 
+    END AS Delta_GA,
+    prix_modal_LC, detention_modal_LC, prix_modal_ITM, detention_modal_ITM,prix_modal_auchan, detention_modal_auchan,
+    prix_moyen_BIOCOOP, detention_BIOCOOP, prix_moyen_LAVIECLAIRE, detention_LAVIECLAIRE, prix_moyen_NATURALIA, detention_NATURALIA,
+    ROW_NUMBER () OVER (PARTITION BY ref_produit, libelle_article ORDER BY code_groupe_de_famille, sensi_tvs DESC) RANG
+    FROM vg1p-apps-pricingkf-prd01-52.Cheikh_Niang.temp_join a
+    WHERE sensi_tvs is not null
+    GROUP BY ref_produit, libelle_article, poids_crf, poids_tvs, qty_tvs_12_mois, ca_ht_tvs_12_mois, ca_ttc_tvs_12_mois,
+    prix_moyen_marche, detention_marche, prix_modal_lidl, detention_modal_lidl, detention_lidl, prix_modal_GF, detention_modal_GF,
+    detention_GF, prix_moyen_LC, detention_LC, prix_moyen_ITM, detention_ITM, prix_moyen_U, detention_U, prix_moyen_GA, detention_GA,
+    sensi_tvs, prix_moyen_marche_lw, prix_moyen_LC_lw, prix_moyen_ITM_lw, prix_moyen_GA_lw, 
+    prix_modal_lidl_lw, prix_modal_GF_lw, prix_moyen_U_lw, code_groupe_de_famille, prix_moyen_GF,
+    lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, prix_moyen_CRF, prix_moyen_lidl, detention_CRF,
+    prix_modal_LC, detention_modal_LC, prix_modal_ITM, detention_modal_ITM, prix_moyen_BIOCOOP, detention_BIOCOOP, prix_moyen_LAVIECLAIRE, detention_LAVIECLAIRE, prix_moyen_NATURALIA, detention_NATURALIA,
+    prix_modal_u,detention_modal_u,prix_modal_auchan, detention_modal_auchan, prix_moyen_auchan, detention_auchan, prix_moyen_auchan_lw
+    ORDER BY ref_produit
+)
+
+SELECT  code_groupe_de_famille, lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, libelle_article, sensi_tvs, pa_actuel, srp_ttc, TVA,
+Prix_futur_H1,  Prix_futur_H2,  Prix_futur_H3,  Prix_futur_H4,  Prix_futur_H5,Prix_futur_H6,Prix_futur_H7,(CASE
+WHEN Prix_futur_H6 > 0 THEN (Prix_futur_H6/(1+TVA/100)-pa_actuel)/(Prix_futur_H6/(1+TVA/100))
+ELSE
+0
+END
+)AS tx_marge,
+qty_tvs_12_mois, ca_ttc_tvs_12_mois, ca_ht_tvs_12_mois, 
+prix_moyen_marche, detention_marche, prix_modal_lidl_lw,Delta_LIDL, prix_modal_GF_lw,Delta_GF, prix_moyen_LC_lw,Delta_LC, prix_moyen_ITM_lw,Delta_ITM,
+prix_moyen_auchan_lw,Delta_auchan, prix_moyen_U_lw,Delta_U,
+prix_modal_lidl, detention_modal_lidl, detention_lidl,
+prix_modal_GF, detention_modal_GF, detention_GF, prix_moyen_LC, prix_modal_LC, detention_modal_LC, detention_LC, 
+prix_moyen_ITM, prix_modal_ITM, detention_modal_ITM, detention_ITM, prix_moyen_auchan, prix_modal_auchan, detention_modal_auchan, detention_auchan,
+prix_moyen_u, prix_modal_u,detention_modal_u,detention_U , prix_moyen_GA, detention_GA
+--, prix_moyen_CRF, detention_CRF
+FROM ranking_temp
+WHERE RANG = 1
+GROUP BY code_groupe_de_famille, lib_groupe_de_famille, code_groupe_de_sous_famille, lib_groupe_de_sous_famille, ref_produit, libelle_article, sensi_tvs, pa_actuel, srp_ttc, TVA,
+Prix_futur_H1,  Prix_futur_H2,  Prix_futur_H3,  Prix_futur_H4,  Prix_futur_H5,Prix_futur_H6,Prix_futur_H7,tx_marge ,
+qty_tvs_12_mois, ca_ttc_tvs_12_mois, ca_ht_tvs_12_mois,
+prix_moyen_marche, detention_marche, prix_modal_lidl_lw,Delta_LIDL, prix_modal_GF_lw,Delta_GF, prix_moyen_LC_lw,Delta_LC, prix_moyen_ITM_lw,Delta_ITM,
+prix_moyen_auchan_lw,Delta_auchan, prix_moyen_U_lw,Delta_U,
+prix_modal_lidl, detention_modal_lidl, detention_lidl,
+prix_modal_GF, detention_modal_GF, detention_GF, prix_moyen_LC, prix_modal_LC, detention_modal_LC, detention_LC, 
+prix_moyen_ITM, prix_modal_ITM, detention_modal_ITM, detention_ITM, prix_moyen_auchan, prix_modal_auchan, detention_modal_auchan, detention_auchan,
+prix_moyen_u,detention_U, prix_modal_u,detention_modal_u , prix_moyen_GA, detention_GA
+--, prix_moyen_CRF, detention_CRF
+
+order by ca_ht_tvs_12_mois desc
